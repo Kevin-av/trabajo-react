@@ -1,8 +1,11 @@
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View} from "react-native";
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
+import domtoimage from 'dom-to-image';
+import { useState, useRef, Platform } from 'react';
 
 import Button from './components/Buttons';
 import ImageViewer from './components/ImageViewer';
@@ -15,6 +18,12 @@ import EmojiSticker from './components/EmojiSticker';
 const PlaceholderImage = require("./assets/image/unnamed.jpg");
 
 export default function App() {
+  const imageRef = useRef();
+  const [status, requestPermission] = MediaLibrary.usePermissions();
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [pickedEmoji, setPickedEmoji] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [showAppOptions, setShowAppOptions] = useState(false);
   
   const onAddSticker = () => {
     setIsModalVisible(true);
@@ -29,32 +38,50 @@ export default function App() {
   };
   
   const onSaveImageAsync = async () => {
-    // we will implement this later
+    try {
+      const localUri = await captureRef(imageRef, {
+        height: 440,
+        quality: 1,
+      });
+  
+      if (localUri) {
+        if (Platform.OS !== 'web') {
+          await MediaLibrary.saveToLibraryAsync(localUri);
+          alert("Saved!");
+        } else {
+          alert("Save to library is not supported on the web.");
+        }
+      }
+    } catch (error) {
+      console.error('Error saving image to library:', error);
+    }
   };
-
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [pickedEmoji, setPickedEmoji] = useState(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [showAppOptions, setShowAppOptions] = useState(false);
   
   const pickImageAsync = async () => {
+    try {
       const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      quality: 1,
-    });
-    if (!result.canceled) {
-      setSelectedImage(result.uri);
-      setShowAppOptions(true);
-    } else {
-      alert('You did not select any image.');
+        allowsEditing: true,
+        quality: 1,
+      });
+  
+      if (!result.canceled) {
+        setSelectedImage(result.uri);
+        setShowAppOptions(true);
+      } else {
+        alert('You did not select any image.');
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
     }
+  };
 
-    }
     return (
       <GestureHandlerRootView style={styles.container}>
         <View style={styles.imageContainer}>
-          <ImageViewer placeholderImageSource={PlaceholderImage} selectedImage={selectedImage}/>
-          {pickedEmoji && <EmojiSticker imageSize={40} stickerSource={pickedEmoji}/>}
+          <View ref={imageRef} collapsable={false}>
+            <ImageViewer placeholderImageSource={PlaceholderImage} selectedImage={selectedImage}/>
+            {pickedEmoji && <EmojiSticker imageSize={40} stickerSource={pickedEmoji}/>}
+          </View>
         </View>
         {showAppOptions ? (
           <View style={styles.optionsContainer}>
